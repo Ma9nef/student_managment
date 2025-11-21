@@ -21,7 +21,11 @@ pipeline {
         sh 'mvn test || true'
     }
 }
-
+        stage('mvn package'){
+            steps {
+                sh 'mvn package'
+            } 
+        }
     }
 
     post {
