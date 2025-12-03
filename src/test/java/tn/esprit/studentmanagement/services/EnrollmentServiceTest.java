@@ -64,8 +64,7 @@ class EnrollmentServiceTest {
     void testSaveEnrollment() {
         // Arrange
         Enrollment e = new Enrollment();
-        e.setGrade(15.0); // ✔️ correct pour un Double
-
+        e.setGrade(15.0); // ✔ Valeur numérique
 
         when(enrollmentRepository.save(e)).thenReturn(e);
 
@@ -74,7 +73,7 @@ class EnrollmentServiceTest {
 
         // Assert
         assertNotNull(result);
-        assertEquals("A", result.getGrade());
+        assertEquals(15.0, result.getGrade()); // ✔ Comparaison correcte
         verify(enrollmentRepository, times(1)).save(e);
     }
 
