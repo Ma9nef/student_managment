@@ -1,6 +1,9 @@
 package tn.esprit.studentmanagement;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest
 class StudentManagementApplicationTests {
@@ -8,7 +11,6 @@ class StudentManagementApplicationTests {
     @Test
     void contextLoads() {
         StudentManagementApplication.main(new String[]{});
-        assertTrue(true);
+        assertNotNull(StudentManagementApplication.class);
     }
 }
-
