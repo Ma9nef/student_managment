@@ -1,21 +1,28 @@
-# Étape 1 : Build avec Maven
+# ---- Stage 1: Build ----
 FROM maven:3.9.6-eclipse-temurin-17 AS build
-WORKDIR /app
+WORKDIR /workspace
 
 COPY pom.xml .
-RUN mvn -B dependency:go-offline
+RUN mvn dependency:go-offline -B
 
-COPY src ./src
-RUN mvn -B -e -X clean package -DskipTests -Dmaven.wagon.http.retryHandler.count=10
+COPY src src
+RUN mvn clean package -DskipTests -B
 
-# Étape 2 : Runtime léger
-FROM eclipse-temurin:17-jdk
+# ---- Stage 2: Production Runtime ----
+FROM gcr.io/distroless/java17-debian12:nonroot
+
 WORKDIR /app
 
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /workspace/target/*.jar /app/app.jar
 
 EXPOSE 8089
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
-ENV SPRING_DATASOURCE_URL=none
-ENV SPRING_JPA_HIBERNATE_DDL_AUTO=none
+# Add a production health check endpoint
+# (Spring Boot Actuator must be enabled)
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD wget -qO- http://localhost:8089/actuator/health || exit 1
+
+# Run using non-root user for security
+USER nonroot
+
+ENTRYPOINT [ "java", "-jar", "/app/app.jar" ]
