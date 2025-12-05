@@ -7,6 +7,11 @@ pipeline {
         maven 'M2_HOME'
     }
 
+    environment {
+        IMAGE_NAME = "manef99/alpine"
+        IMAGE_TAG = "1.0.0"
+    }
+
     stages {
 
         /* 🔹 Checkout source code */
@@ -35,14 +40,41 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
-
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-
+                    withCredentials([
+                        string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')
+                    ]) {
                         sh """
                             mvn sonar:sonar \
-                            -Dsonar.token=$SONAR_TOKEN
+                                -Dsonar.token=$SONAR_TOKEN
                         """
                     }
+                }
+            }
+        }
+
+        /* 🔹 Build Docker Image */
+        stage('Build Docker Image') {
+            steps {
+                sh """
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                """
+            }
+        }
+
+        /* 🔹 Push Docker Image to Docker Hub */
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'docker-hub-cred',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh """
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    """
                 }
             }
         }
