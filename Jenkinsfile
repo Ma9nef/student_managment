@@ -1,5 +1,4 @@
 pipeline {
-
     agent any
 
     tools {
@@ -8,13 +7,14 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME = "manef99/alpine"
-        IMAGE_TAG = "1.0.0"
+        // 🔹 CHANGE THIS: This will create a repo named 'student-management' in your Docker Hub
+        IMAGE_NAME = "manef99/student-management" 
+        // 🔹 This creates a unique tag per build (e.g., 1.0.0-1, 1.0.0-2)
+        IMAGE_TAG = "1.0.0-${env.BUILD_NUMBER}"
     }
 
     stages {
-
-        /* 🔹 Checkout source code */
+        
         stage('Checkout Source') {
             steps {
                 git branch: 'main',
@@ -22,55 +22,41 @@ pipeline {
             }
         }
 
-        /* 🔹 Run tests + generate JaCoCo coverage */
         stage('Run Tests') {
             steps {
                 sh 'mvn clean verify'
             }
         }
 
-        /* 🔹 Build package */
+        // 'verify' usually packages the app, but running package ensures the JAR is in /target
         stage('Build Package') {
             steps {
-                sh 'mvn package'
+                sh 'mvn package -DskipTests' // Skip tests here as they ran in the previous stage
             }
         }
 
-        /* 🔹 SonarQube analysis */
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonarqube') {
-                    withCredentials([
-                        string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')
-                    ]) {
-                        sh """
-                            mvn sonar:sonar \
-                                -Dsonar.token=$SONAR_TOKEN
-                        """
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                        sh "mvn sonar:sonar -Dsonar.token=$SONAR_TOKEN"
                     }
                 }
             }
         }
 
-        /* 🔹 Build Docker Image */
         stage('Build Docker Image') {
             steps {
-                sh """
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                """
+                script {
+                    echo "Building Docker Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                }
             }
         }
 
-        /* 🔹 Push Docker Image to Docker Hub */
         stage('Push Docker Image') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'docker-hub-cred',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]) {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh """
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                         docker push ${IMAGE_NAME}:${IMAGE_TAG}
@@ -82,10 +68,14 @@ pipeline {
 
     post {
         success {
-            echo "✅ Pipeline executed successfully."
+            echo "✅ Pipeline executed successfully. Image pushed to Docker Hub: ${IMAGE_NAME}:${IMAGE_TAG}"
         }
         failure {
-            echo "❌ Pipeline failed. Check logs for details."
+            echo "❌ Pipeline failed."
+        }
+        cleanup {
+            // Optional: Remove the image from the Jenkins server to save space
+            sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
         }
     }
 }
