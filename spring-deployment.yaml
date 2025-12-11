@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: spring-app
-          image: manef99/student-management:latest
-          imagePullPolicy: Always
+          image: manef99/student-management:1.0.0-59   # ✔ USE SPECIFIC TAG
+          imagePullPolicy: Always                      # ✔ Force pull
           ports:
             - containerPort: 8080
           env:
@@ -35,20 +35,4 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: spring-secret
-                  key: SPRING_DATASOURCE_PASSWORD
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: spring-service
-  namespace: devops
-spec:
-  type: NodePort
-  selector:
-    app: spring-app
-  ports:
-    - port: 8080
-      targetPort: 8080
-      nodePort: 30080
+                  name:
