@@ -9,6 +9,7 @@ pipeline {
     environment {
         IMAGE_NAME = "manef99/student-management"
         IMAGE_TAG = "1.0.0-${env.BUILD_NUMBER}"
+        K8S_NAMESPACE = "devops"
     }
 
     stages {
@@ -20,12 +21,11 @@ pipeline {
             }
         }
 
-      stage('Run Tests') {
-    steps {
-        sh 'mvn -DskipTests=true clean verify'
-    }
-}
-
+        stage('Run Tests') {
+            steps {
+                sh 'mvn clean verify -DskipTests=false'
+            }
+        }
 
         stage('Build Package') {
             steps {
@@ -48,8 +48,6 @@ pipeline {
                 script {
                     echo "Building Docker Image: ${IMAGE_NAME}:${IMAGE_TAG}"
                     sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
-
-                    // 🔥 NECESSARY FOR KUBERNETES
                     sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
                 }
             }
@@ -57,10 +55,13 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                withCredentials([
+                    usernamePassword(credentialsId: 'docker-hub-cred', 
+                                     usernameVariable: 'DOCKER_USER', 
+                                     passwordVariable: 'DOCKER_PASS')
+                ]) {
                     sh """
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-
                         docker push ${IMAGE_NAME}:${IMAGE_TAG}
                         docker push ${IMAGE_NAME}:latest
                     """
@@ -68,26 +69,49 @@ pipeline {
             }
         }
 
-      stage('Deploy to Kubernetes') {
-    steps {
-        script {
-            echo "🚀 Deploying to Kubernetes..."
+        stage('Create K8s Docker Secret') {
+            steps {
+                withCredentials([
+                    usernamePassword(credentialsId: 'docker-hub-cred', 
+                                     usernameVariable: 'DOCKER_USER', 
+                                     passwordVariable: 'DOCKER_PASS')
+                ]) {
+                    sh """
+                        echo "🔐 Updating Kubernetes Docker registry secret..."
 
-            sh "kubectl apply -f configmap.yaml -n devops"
-            sh "kubectl apply -f secret.yaml -n devops"
-            sh "kubectl apply -f mysql-deployment.yaml -n devops"
-            sh "kubectl apply -f spring-deployment.yaml -n devops"
+                        kubectl delete secret regcred -n ${K8S_NAMESPACE} --ignore-not-found
 
-            sh "kubectl get pods -n devops"
+                        kubectl create secret docker-registry regcred \
+                          --docker-server=https://index.docker.io/v1/ \
+                          --docker-username=$DOCKER_USER \
+                          --docker-password=$DOCKER_PASS \
+                          --docker-email=${DOCKER_USER}@users.noreply.github.com \
+                          -n ${K8S_NAMESPACE}
+                    """
+                }
+            }
         }
-    }
-}
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    echo "🚀 Deploying to Kubernetes..."
+
+                    sh "kubectl apply -f configmap.yaml -n ${K8S_NAMESPACE}"
+                    sh "kubectl apply -f secret.yaml -n ${K8S_NAMESPACE}"
+                    sh "kubectl apply -f mysql-deployment.yaml -n ${K8S_NAMESPACE}"
+                    sh "kubectl apply -f spring-deployment.yaml -n ${K8S_NAMESPACE}"
+
+                    sh "kubectl get pods -n ${K8S_NAMESPACE}"
+                }
+            }
+        }
 
     }
 
     post {
         success {
-            echo "✅ Pipeline executed successfully. Image pushed & Kubernetes updated."
+            echo "✅ Pipeline executed successfully. Application deployed on Kubernetes."
         }
         failure {
             echo "❌ Pipeline failed."
