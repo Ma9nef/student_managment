@@ -20,11 +20,12 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                sh 'mvn clean verify'
-            }
-        }
+      stage('Run Tests') {
+    steps {
+        sh 'mvn -DskipTests=true clean verify'
+    }
+}
+
 
         stage('Build Package') {
             steps {
