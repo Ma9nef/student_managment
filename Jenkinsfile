@@ -23,7 +23,7 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                sh 'mvn clean verify -DskipTests=false'
+                sh 'mvn clean verify -DskipTests'
             }
         }
 
