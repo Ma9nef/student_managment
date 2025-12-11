@@ -67,18 +67,21 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    echo "🚀 Deploying to Kubernetes..."
+      stage('Deploy to Kubernetes') {
+    steps {
+        script {
+            echo "🚀 Deploying to Kubernetes..."
 
-                    sh "kubectl apply -f mysql-deployment.yaml -n devops"
-                    sh "kubectl apply -f spring-deployment.yaml -n devops"
+            sh "kubectl apply -f configmap.yaml -n devops"
+            sh "kubectl apply -f secret.yaml -n devops"
+            sh "kubectl apply -f mysql-deployment.yaml -n devops"
+            sh "kubectl apply -f spring-deployment.yaml -n devops"
 
-                    sh "kubectl get pods -n devops"
-                }
-            }
+            sh "kubectl get pods -n devops"
         }
+    }
+}
+
     }
 
     post {
