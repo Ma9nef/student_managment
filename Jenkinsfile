@@ -7,14 +7,12 @@ pipeline {
     }
 
     environment {
-        // 🔹 CHANGE THIS: This will create a repo named 'student-management' in your Docker Hub
-        IMAGE_NAME = "manef99/student-management" 
-        // 🔹 This creates a unique tag per build (e.g., 1.0.0-1, 1.0.0-2)
+        IMAGE_NAME = "manef99/student-management"
         IMAGE_TAG = "1.0.0-${env.BUILD_NUMBER}"
     }
 
     stages {
-        
+
         stage('Checkout Source') {
             steps {
                 git branch: 'main',
@@ -28,10 +26,9 @@ pipeline {
             }
         }
 
-        // 'verify' usually packages the app, but running package ensures the JAR is in /target
         stage('Build Package') {
             steps {
-                sh 'mvn package -DskipTests' // Skip tests here as they ran in the previous stage
+                sh 'mvn package -DskipTests'
             }
         }
 
@@ -50,6 +47,9 @@ pipeline {
                 script {
                     echo "Building Docker Image: ${IMAGE_NAME}:${IMAGE_TAG}"
                     sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+
+                    // 🔥 NECESSARY FOR KUBERNETES
+                    sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
                 }
             }
         }
@@ -59,8 +59,23 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh """
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
                         docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${IMAGE_NAME}:latest
                     """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    echo "🚀 Deploying to Kubernetes..."
+
+                    sh "kubectl apply -f mysql-deployment.yaml -n devops"
+                    sh "kubectl apply -f spring-deployment.yaml -n devops"
+
+                    sh "kubectl get pods -n devops"
                 }
             }
         }
@@ -68,14 +83,14 @@ pipeline {
 
     post {
         success {
-            echo "✅ Pipeline executed successfully. Image pushed to Docker Hub: ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "✅ Pipeline executed successfully. Image pushed & Kubernetes updated."
         }
         failure {
             echo "❌ Pipeline failed."
         }
         cleanup {
-            // Optional: Remove the image from the Jenkins server to save space
             sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
+            sh "docker rmi ${IMAGE_NAME}:latest || true"
         }
     }
 }
