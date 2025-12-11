@@ -9,7 +9,7 @@ pipeline {
     environment {
         IMAGE_NAME = "manef99/student-management"
         IMAGE_TAG = "1.0.0-${env.BUILD_NUMBER}"
-        K8S_NAMESPACE = "devops"
+        K8S_DEPLOY_FILE = "spring-deployment.yaml"
     }
 
     stages {
@@ -23,7 +23,7 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                sh 'mvn clean verify -DskipTests'
+                sh 'mvn -DskipTests=true clean verify'
             }
         }
 
@@ -47,6 +47,7 @@ pipeline {
             steps {
                 script {
                     echo "Building Docker Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+
                     sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                     sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest"
                 }
@@ -55,13 +56,10 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([
-                    usernamePassword(credentialsId: 'docker-hub-cred', 
-                                     usernameVariable: 'DOCKER_USER', 
-                                     passwordVariable: 'DOCKER_PASS')
-                ]) {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh """
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
                         docker push ${IMAGE_NAME}:${IMAGE_TAG}
                         docker push ${IMAGE_NAME}:latest
                     """
@@ -69,25 +67,17 @@ pipeline {
             }
         }
 
-        stage('Create K8s Docker Secret') {
+        stage('Update K8s Deployment File With Latest Image') {
             steps {
-                withCredentials([
-                    usernamePassword(credentialsId: 'docker-hub-cred', 
-                                     usernameVariable: 'DOCKER_USER', 
-                                     passwordVariable: 'DOCKER_PASS')
-                ]) {
+                script {
+                    echo "Updating ${K8S_DEPLOY_FILE} with latest image tag..."
+
                     sh """
-                        echo "🔐 Updating Kubernetes Docker registry secret..."
-
-                        kubectl delete secret regcred -n ${K8S_NAMESPACE} --ignore-not-found
-
-                        kubectl create secret docker-registry regcred \
-                          --docker-server=https://index.docker.io/v1/ \
-                          --docker-username=$DOCKER_USER \
-                          --docker-password=$DOCKER_PASS \
-                          --docker-email=${DOCKER_USER}@users.noreply.github.com \
-                          -n ${K8S_NAMESPACE}
+                        sed -i 's|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|g' ${K8S_DEPLOY_FILE}
                     """
+
+                    echo "Updated deployment file:"
+                    sh "cat ${K8S_DEPLOY_FILE}"
                 }
             }
         }
@@ -97,21 +87,21 @@ pipeline {
                 script {
                     echo "🚀 Deploying to Kubernetes..."
 
-                    sh "kubectl apply -f configmap.yaml -n ${K8S_NAMESPACE}"
-                    sh "kubectl apply -f secret.yaml -n ${K8S_NAMESPACE}"
-                    sh "kubectl apply -f mysql-deployment.yaml -n ${K8S_NAMESPACE}"
-                    sh "kubectl apply -f spring-deployment.yaml -n ${K8S_NAMESPACE}"
+                    sh "kubectl apply -f configmap.yaml -n devops"
+                    sh "kubectl apply -f secret.yaml -n devops"
+                    sh "kubectl apply -f mysql-deployment.yaml -n devops"
+                    sh "kubectl apply -f ${K8S_DEPLOY_FILE} -n devops"
 
-                    sh "kubectl get pods -n ${K8S_NAMESPACE}"
+                    sh "kubectl rollout restart deployment spring-deployment -n devops"
+                    sh "kubectl get pods -n devops"
                 }
             }
         }
-
     }
 
     post {
         success {
-            echo "✅ Pipeline executed successfully. Application deployed on Kubernetes."
+            echo "✅ Pipeline executed successfully. New image deployed: ${IMAGE_TAG}"
         }
         failure {
             echo "❌ Pipeline failed."
