@@ -21,11 +21,6 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                sh 'mvn -DskipTests=true clean verify'
-            }
-        }
 
      stage('Run Tests & Coverage') {
     steps {
