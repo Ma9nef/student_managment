@@ -27,21 +27,26 @@ pipeline {
             }
         }
 
-        stage('Build Package') {
-            steps {
-                sh 'mvn package -DskipTests'
-            }
-        }
+     stage('Run Tests & Coverage') {
+    steps {
+        sh 'mvn clean verify'
+    }
+}
 
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('sonarqube') {
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        sh "mvn sonar:sonar -Dsonar.token=$SONAR_TOKEN"
-                    }
-                }
+stage('SonarQube Analysis') {
+    steps {
+        withSonarQubeEnv('sonarqube') {
+            withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                sh """
+                  mvn sonar:sonar \
+                  -Dsonar.token=$SONAR_TOKEN \
+                  -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                """
             }
         }
+    }
+}
+
 
         stage('Build Docker Image') {
             steps {
