@@ -20,6 +20,8 @@ pipeline {
 
   stages {
 
+    /* ===================== CHECKOUT ===================== */
+
     stage('Checkout Source') {
       steps {
         checkout scm
@@ -63,9 +65,7 @@ pipeline {
             sh '''
               echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
               docker build -t $BACKEND_IMAGE:$IMAGE_TAG .
-              docker tag $BACKEND_IMAGE:$IMAGE_TAG $BACKEND_IMAGE:latest
               docker push $BACKEND_IMAGE:$IMAGE_TAG
-              docker push $BACKEND_IMAGE:latest
             '''
           }
         }
@@ -73,15 +73,6 @@ pipeline {
     }
 
     /* ===================== FRONTEND ===================== */
-
-    stage('Frontend - Build Angular') {
-      steps {
-        dir('frontend') {
-          sh 'npm ci'
-          sh 'npm run build'
-        }
-      }
-    }
 
     stage('Frontend - Docker Build & Push') {
       steps {
@@ -94,9 +85,7 @@ pipeline {
             sh '''
               echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
               docker build -t $FRONTEND_IMAGE:$IMAGE_TAG .
-              docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
               docker push $FRONTEND_IMAGE:$IMAGE_TAG
-              docker push $FRONTEND_IMAGE:latest
             '''
           }
         }
@@ -105,7 +94,7 @@ pipeline {
 
     /* ===================== KUBERNETES ===================== */
 
-    stage('Deploy to Kubernetes (3 pods)') {
+    stage('Deploy to Kubernetes') {
       steps {
         dir('k8s') {
           sh '''
@@ -113,6 +102,10 @@ pipeline {
 
             # Namespace (idempotent)
             kubectl get ns $K8S_NAMESPACE >/dev/null 2>&1 || kubectl create ns $K8S_NAMESPACE
+
+            # Inject image tags
+            sed -i "s|__BACKEND_IMAGE__|$BACKEND_IMAGE:$IMAGE_TAG|g" spring-deployment.yaml
+            sed -i "s|__FRONTEND_IMAGE__|$FRONTEND_IMAGE:$IMAGE_TAG|g" angular-deployment.yaml
 
             # Apply manifests
             kubectl apply -n $K8S_NAMESPACE -f configmap.yaml
@@ -122,11 +115,7 @@ pipeline {
             kubectl apply -n $K8S_NAMESPACE -f angular-deployment.yaml
             kubectl apply -n $K8S_NAMESPACE -f angular-service.yaml
 
-            # Restart deployments to pull latest images
-            kubectl rollout restart deployment spring-deployment  -n $K8S_NAMESPACE
-            kubectl rollout restart deployment angular-deployment -n $K8S_NAMESPACE
-
-            # Wait for readiness
+            # Rollout status
             kubectl rollout status deployment spring-deployment  -n $K8S_NAMESPACE --timeout=180s
             kubectl rollout status deployment angular-deployment -n $K8S_NAMESPACE --timeout=180s
 
@@ -140,7 +129,7 @@ pipeline {
 
   post {
     success {
-      echo "✅ Deployed successfully (tag: ${IMAGE_TAG})"
+      echo "✅ Deployed successfully with tag: ${IMAGE_TAG}"
     }
     failure {
       echo "❌ Pipeline failed"
