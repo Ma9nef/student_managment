@@ -111,27 +111,26 @@ pipeline {
           sh '''
             set -e
 
-            # 1) Namespace (idempotent)
+            # Namespace (idempotent)
             kubectl get ns $K8S_NAMESPACE >/dev/null 2>&1 || kubectl create ns $K8S_NAMESPACE
 
-            # 2) Apply manifests
+            # Apply manifests
             kubectl apply -n $K8S_NAMESPACE -f configmap.yaml
             kubectl apply -n $K8S_NAMESPACE -f secret.yaml
             kubectl apply -n $K8S_NAMESPACE -f mysql-deployment.yaml
             kubectl apply -n $K8S_NAMESPACE -f spring-deployment.yaml
             kubectl apply -n $K8S_NAMESPACE -f angular-deployment.yaml
+            kubectl apply -n $K8S_NAMESPACE -f angular-service.yaml
 
-            # 3) Force Spring & Angular to use the new images (NO guessing)
-            # IMPORTANT: container name must match your YAML container name
-            kubectl set image deployment/student-management-backend  student-management-backend=$BACKEND_IMAGE:$IMAGE_TAG  -n $K8S_NAMESPACE
-            kubectl set image deployment/student-management-frontend student-management-frontend=$FRONTEND_IMAGE:$IMAGE_TAG -n $K8S_NAMESPACE
+            # Restart deployments to pull latest images
+            kubectl rollout restart deployment spring-deployment  -n $K8S_NAMESPACE
+            kubectl rollout restart deployment angular-deployment -n $K8S_NAMESPACE
 
-            # 4) Wait for rollouts (avoid "pods not updated" confusion)
-            kubectl rollout status deployment/student-management-backend  -n $K8S_NAMESPACE --timeout=180s
-            kubectl rollout status deployment/student-management-frontend -n $K8S_NAMESPACE --timeout=180s
-            kubectl rollout status deployment/student-mysql               -n $K8S_NAMESPACE --timeout=180s
+            # Wait for readiness
+            kubectl rollout status deployment spring-deployment  -n $K8S_NAMESPACE --timeout=180s
+            kubectl rollout status deployment angular-deployment -n $K8S_NAMESPACE --timeout=180s
 
-            # 5) Proof: show the 3 pods
+            # Proof
             kubectl get pods -n $K8S_NAMESPACE -o wide
           '''
         }
