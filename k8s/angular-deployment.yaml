@@ -16,5 +16,6 @@ spec:
       containers:
         - name: angular
           image: manef99/student-management-frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
