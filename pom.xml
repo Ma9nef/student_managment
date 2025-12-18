@@ -5,7 +5,6 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Spring Boot parent -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -19,41 +18,66 @@
     <name>student-management</name>
     <description>Student Management Application</description>
 
-    <!-- Global properties -->
     <properties>
         <java.version>17</java.version>
 
         <!-- SonarQube -->
         <sonar.projectKey>student_management</sonar.projectKey>
         <sonar.projectName>student_management</sonar.projectName>
+
+        <!-- Keep external deps versions centralized -->
+        <springdoc.version>2.5.0</springdoc.version>
+        <jacoco.version>0.8.12</jacoco.version>
     </properties>
 
-    <!-- Dependencies -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Keeps springdoc version consistent -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
 
-        <!-- Spring Boot -->
+        <!-- Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
-        <!-- MySQL (production/runtime) -->
+        <!-- MySQL (runtime) -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- H2 (tests only) -->
+        <!-- Actuator (health/info/metrics endpoints) -->
         <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>test</scope>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Prometheus registry (creates /actuator/prometheus) -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Swagger / OpenAPI -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
         <!-- Lombok -->
@@ -63,50 +87,45 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Spring Boot test (JUnit 5, Mockito, AssertJ included) -->
+        <!-- Tests -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 
-        <!-- OpenAPI / Swagger -->
+        <!-- H2 (tests only) -->
         <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.5.0</version>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
         </dependency>
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-actuator</artifactId>
-</dependency>
-
-<dependency>
-    <groupId>io.micrometer</groupId>
-    <artifactId>micrometer-registry-prometheus</artifactId>
-</dependency>
 
     </dependencies>
 
-    <!-- Build configuration -->
     <build>
         <plugins>
 
-            <!-- JaCoCo: coverage -->
+            <!-- Ensures compilation uses Java 17 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release>${java.version}</release>
+                </configuration>
+            </plugin>
+
+            <!-- JaCoCo coverage -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.12</version>
+                <version>${jacoco.version}</version>
                 <executions>
-
-                    <!-- Attach agent before tests -->
                     <execution>
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
                     </execution>
-
-                    <!-- Generate report after tests -->
                     <execution>
                         <id>report</id>
                         <phase>verify</phase>
@@ -114,7 +133,6 @@
                             <goal>report</goal>
                         </goals>
                     </execution>
-
                 </executions>
             </plugin>
 
