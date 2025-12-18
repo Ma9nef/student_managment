@@ -8,7 +8,7 @@ pipeline {
   }
 
   environment {
-    BACKEND_IMAGE  = "manef99/student-management-backend"
+    BACKEND_IMAGE  = "manef99/student-management"
     FRONTEND_IMAGE = "manef99/student-management-frontend"
     IMAGE_TAG      = "1.0.0-${env.BUILD_NUMBER}"
     K8S_NAMESPACE  = "devops"
@@ -105,7 +105,7 @@ pipeline {
             echo "==> Ensure namespace"
             kubectl get ns $K8S_NAMESPACE >/dev/null 2>&1 || kubectl create ns $K8S_NAMESPACE
 
-            echo "==> Restore clean manifests (important)"
+            echo "==> Restore clean manifests"
             git checkout -- spring-deployment.yaml angular-deployment.yaml || true
 
             echo "==> Inject image tags"
@@ -120,16 +120,13 @@ pipeline {
             kubectl apply -n $K8S_NAMESPACE -f angular-deployment.yaml
             kubectl apply -n $K8S_NAMESPACE -f angular-service.yaml
 
-            echo "==> FORCE rollout (CRITICAL)"
+            echo "==> Force rollout"
             kubectl rollout restart deployment spring-deployment  -n $K8S_NAMESPACE
             kubectl rollout restart deployment angular-deployment -n $K8S_NAMESPACE
 
             echo "==> Wait for readiness"
             kubectl rollout status deployment spring-deployment  -n $K8S_NAMESPACE --timeout=180s
             kubectl rollout status deployment angular-deployment -n $K8S_NAMESPACE --timeout=180s
-
-            echo "==> Pods running"
-            kubectl get pods -n $K8S_NAMESPACE -o wide
 
             echo "==> Images actually running"
             kubectl get pods -n $K8S_NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{" => "}{range .spec.containers[*]}{.image}{"\\n"}{end}{end}'
