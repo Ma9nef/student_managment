@@ -14,10 +14,10 @@ spec:
         app: spring-app
     spec:
       imagePullSecrets:
-        - name: regcred             # ✔ CRITICAL: Allows K8s to pull your DockerHub image
+        - name: regcred
       containers:
         - name: spring-app
-          image: manef99/student-management:1.0.0-59   # ✔ Specific version tag
+          image: __BACKEND_IMAGE__
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
