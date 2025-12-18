@@ -66,7 +66,7 @@ pipeline {
               set -e
               echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
               docker build -t $BACKEND_IMAGE:$IMAGE_TAG .
-              docker push $BACKEND_IMAGE:$IMAGE_TAG
+              docker push  $BACKEND_IMAGE:$IMAGE_TAG
             '''
           }
         }
@@ -87,7 +87,7 @@ pipeline {
               set -e
               echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
               docker build -t $FRONTEND_IMAGE:$IMAGE_TAG .
-              docker push $FRONTEND_IMAGE:$IMAGE_TAG
+              docker push  $FRONTEND_IMAGE:$IMAGE_TAG
             '''
           }
         }
@@ -106,7 +106,7 @@ pipeline {
             kubectl get ns $K8S_NAMESPACE >/dev/null 2>&1 || kubectl create ns $K8S_NAMESPACE
 
             echo "==> Restore clean manifests"
-            git checkout -- spring-deployment.yaml angular-deployment.yaml || true
+            git checkout -- spring-deployment.yaml angular-deployment.yaml
 
             echo "==> Inject image tags"
             sed -i "s|__BACKEND_IMAGE__|$BACKEND_IMAGE:$IMAGE_TAG|g" spring-deployment.yaml
@@ -128,7 +128,7 @@ pipeline {
             kubectl rollout status deployment spring-deployment  -n $K8S_NAMESPACE --timeout=180s
             kubectl rollout status deployment angular-deployment -n $K8S_NAMESPACE --timeout=180s
 
-            echo "==> Images actually running"
+            echo "==> FINAL PROOF (IMAGES RUNNING)"
             kubectl get pods -n $K8S_NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{" => "}{range .spec.containers[*]}{.image}{"\\n"}{end}{end}'
           '''
         }
@@ -138,13 +138,10 @@ pipeline {
 
   post {
     success {
-      echo "✅ Deployed successfully with tag: ${IMAGE_TAG}"
+      echo "✅ Deployment OK — version ${IMAGE_TAG}"
     }
     failure {
       echo "❌ Pipeline failed"
-    }
-    cleanup {
-      sh 'docker system prune -f'
     }
   }
 }
