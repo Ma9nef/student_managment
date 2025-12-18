@@ -63,6 +63,7 @@ pipeline {
             passwordVariable: 'DOCKER_PASS'
           )]) {
             sh '''
+              set -e
               echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
               docker build -t $BACKEND_IMAGE:$IMAGE_TAG .
               docker push $BACKEND_IMAGE:$IMAGE_TAG
@@ -83,6 +84,7 @@ pipeline {
             passwordVariable: 'DOCKER_PASS'
           )]) {
             sh '''
+              set -e
               echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
               docker build -t $FRONTEND_IMAGE:$IMAGE_TAG .
               docker push $FRONTEND_IMAGE:$IMAGE_TAG
@@ -100,14 +102,17 @@ pipeline {
           sh '''
             set -e
 
-            # Namespace (idempotent)
+            echo "==> Ensure namespace"
             kubectl get ns $K8S_NAMESPACE >/dev/null 2>&1 || kubectl create ns $K8S_NAMESPACE
 
-            # Inject image tags
+            echo "==> Restore clean manifests (important)"
+            git checkout -- spring-deployment.yaml angular-deployment.yaml || true
+
+            echo "==> Inject image tags"
             sed -i "s|__BACKEND_IMAGE__|$BACKEND_IMAGE:$IMAGE_TAG|g" spring-deployment.yaml
             sed -i "s|__FRONTEND_IMAGE__|$FRONTEND_IMAGE:$IMAGE_TAG|g" angular-deployment.yaml
 
-            # Apply manifests
+            echo "==> Apply manifests"
             kubectl apply -n $K8S_NAMESPACE -f configmap.yaml
             kubectl apply -n $K8S_NAMESPACE -f secret.yaml
             kubectl apply -n $K8S_NAMESPACE -f mysql-deployment.yaml
@@ -115,12 +120,19 @@ pipeline {
             kubectl apply -n $K8S_NAMESPACE -f angular-deployment.yaml
             kubectl apply -n $K8S_NAMESPACE -f angular-service.yaml
 
-            # Rollout status
+            echo "==> FORCE rollout (CRITICAL)"
+            kubectl rollout restart deployment spring-deployment  -n $K8S_NAMESPACE
+            kubectl rollout restart deployment angular-deployment -n $K8S_NAMESPACE
+
+            echo "==> Wait for readiness"
             kubectl rollout status deployment spring-deployment  -n $K8S_NAMESPACE --timeout=180s
             kubectl rollout status deployment angular-deployment -n $K8S_NAMESPACE --timeout=180s
 
-            # Proof
+            echo "==> Pods running"
             kubectl get pods -n $K8S_NAMESPACE -o wide
+
+            echo "==> Images actually running"
+            kubectl get pods -n $K8S_NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{" => "}{range .spec.containers[*]}{.image}{"\\n"}{end}{end}'
           '''
         }
       }
