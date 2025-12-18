@@ -1,0 +1,27 @@
+<h3>Department List</h3>
+
+<table border="1">
+  <tr>
+    <th>ID</th>
+    <th>Name</th>
+    <th>Location</th>
+    <th>Phone</th>
+    <th>Head</th>
+    <th>Actions</th>
+  </tr>
+
+  <tr *ngFor="let d of departments">
+    <td>{{ d.idDepartment }}</td>
+    <td>{{ d.name }}</td>
+    <td>{{ d.location }}</td>
+    <td>{{ d.phone }}</td>
+    <td>{{ d.head }}</td>
+    <td>
+      <button (click)="onDelete(d.idDepartment)">Delete</button>
+    </td>
+  </tr>
+
+  <tr *ngIf="departments.length === 0">
+    <td colspan="6">No departments found.</td>
+  </tr>
+</table>
