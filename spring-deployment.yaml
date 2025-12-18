@@ -14,32 +14,21 @@ spec:
         app: spring-app
     spec:
       imagePullSecrets:
-        - name: regcred             # ✔ CRITICAL: Allows K8s to pull your DockerHub image
+        - name: regcred   # requis uniquement si image privée
       containers:
         - name: spring-app
-          image: manef99/student-management:1.0.0-59   # ✔ Specific version tag
+          image: manef99/student-management:1.0.0-59
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
 
-          env:
-            - name: SPRING_DATASOURCE_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: spring-config
-                  key: SPRING_DATASOURCE_URL
+          # ✅ Injection PROPRE et correcte
+          envFrom:
+            - configMapRef:
+                name: spring-config
+            - secretRef:
+                name: spring-secret
 
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom:
-                configMapKeyRef:
-                  name: spring-config
-                  key: SPRING_DATASOURCE_USERNAME
-
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: spring-secret
-                  key: SPRING_DATASOURCE_PASSWORD
 ---
 apiVersion: v1
 kind: Service
