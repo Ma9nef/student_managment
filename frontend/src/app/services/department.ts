@@ -8,7 +8,7 @@ import { environment } from '../../environments/environment';
 })
 export class DepartmentService {
 
-  private baseUrl = `${environment.apiUrl}/Department`;
+private baseUrl = 'http://192.168.49.2:30080/Department';
 
   constructor(private http: HttpClient) {}
 
